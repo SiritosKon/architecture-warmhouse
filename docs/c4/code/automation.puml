@@ -1,0 +1,95 @@
+@startuml automation
+set namespaceSeparator none
+hide empty members
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Code — Automation Service: управление сценариями (UML class diagram)
+
+class Scenario {
+    -id: UUID
+    -houseId: UUID
+    -name: String
+    -active: boolean
+    -lastFiredAt: Instant
+    -cooldown: Duration
+    +activate(): void
+    +deactivate(): void
+    +matches(event: DomainEvent): boolean
+    +execute(): ExecutionResult
+    +getInfo(): ScenarioInfo
+}
+
+class Trigger <<value>> {
+    +eventType: String
+    +conditions: List<Condition>
+    +matches(event: DomainEvent): boolean
+}
+
+abstract class Action {
+    #targetService: String
+    +{abstract} execute(): ActionResult
+}
+
+class RestAction {
+    -operation: String
+    -payload: Map<String, Object>
+    +execute(): ActionResult
+}
+
+class HouseScenarioManager {
+    -houseId: UUID
+    +createScenario(name: String, trigger: Trigger, actions: List<Action>): ScenarioInfo
+    +updateScenario(id: UUID, name: String, trigger: Trigger, actions: List<Action>): ScenarioInfo
+    +deleteScenario(id: UUID): void
+    +listScenarios(): List<ScenarioInfo>
+    +getScenario(id: UUID): ScenarioInfo
+    +activate(id: UUID): void
+    +deactivate(id: UUID): void
+    +runManually(id: UUID): ExecutionRecord
+    +getHistory(id: UUID, period: Duration): List<ExecutionRecord>
+}
+
+class ScenarioInfo <<value>> {
+    +id: UUID
+    +name: String
+    +active: boolean
+    +eventType: String
+    +actionsCount: int
+}
+
+class ExecutionRecord <<value>> {
+    +scenarioId: UUID
+    +firedAt: Instant
+    +event: String
+    +success: boolean
+    +error: String
+}
+
+class ActionResult <<value>> {
+    +success: boolean
+    +error: String
+}
+
+class ExecutionResult <<value>> {
+    +scenarioId: UUID
+    +actionResults: List<ActionResult>
+    +overallSuccess: boolean
+}
+
+RestAction --|> Action
+
+HouseScenarioManager o--> "0..*" Scenario : scenarios
+Scenario *--> "1" Trigger : trigger
+Scenario *--> "0..*" Action : actions
+
+HouseScenarioManager ..> ScenarioInfo : <<produces>>
+HouseScenarioManager ..> ExecutionRecord : <<produces>>
+
+Scenario ..> ExecutionResult : <<returns>>
+Action ..> ActionResult : <<returns>>
+
+ExecutionResult o--> "0..*" ActionResult
+
+@enduml

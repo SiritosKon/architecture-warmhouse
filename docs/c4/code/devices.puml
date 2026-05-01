@@ -1,0 +1,79 @@
+@startuml devices
+set namespaceSeparator none
+hide empty members
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Code — Devices Service: provisioning и lifecycle устройств (UML class diagram)
+
+class Device {
+    -id: UUID
+    -serial: String
+    -model: String
+    -type: DeviceType
+    -ownerId: UUID
+    -houseId: UUID
+    -room: String
+    -status: DeviceStatus
+    -lastSeen: Instant
+    +getInfo(): DeviceInfo
+    +updateMetadata(name: String, room: String): void
+    +markOnline(at: Instant): void
+    +markOffline(): void
+    +decommission(): void
+}
+
+class HouseDeviceManager {
+    -houseId: UUID
+    +registerDevice(serial: String, model: String, ownerId: UUID): DeviceInfo
+    +listDevices(): List<DeviceInfo>
+    +listDevicesByType(type: DeviceType): List<DeviceInfo>
+    +getDevice(id: UUID): DeviceInfo
+    +updateMetadata(id: UUID, name: String, room: String): DeviceInfo
+    +decommissionDevice(id: UUID): void
+    +getRegistryStatus(): RegistryStatus
+}
+
+class DeviceInfo <<value>> {
+    +id: UUID
+    +serial: String
+    +model: String
+    +type: DeviceType
+    +room: String
+    +status: DeviceStatus
+    +lastSeen: Instant
+}
+
+class RegistryStatus <<value>> {
+    +houseId: UUID
+    +totalDevices: int
+    +onlineDevices: int
+    +offlineDevices: int
+}
+
+enum DeviceType {
+    SENSOR
+    RELAY
+    LAMP
+    CAMERA
+    LOCK
+    GATE
+    THERMOSTAT
+}
+
+enum DeviceStatus {
+    ONLINE
+    OFFLINE
+    DECOMMISSIONED
+}
+
+HouseDeviceManager o--> "0..*" Device : devices
+HouseDeviceManager ..> DeviceInfo : <<produces>>
+HouseDeviceManager ..> RegistryStatus : <<produces>>
+
+Device ..> DeviceInfo : <<returns>>
+Device --> DeviceType : type
+Device --> DeviceStatus : status
+
+@enduml

@@ -1,0 +1,94 @@
+@startuml containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_LEFT_RIGHT()
+skinparam linetype polyline
+skinparam nodesep 50
+skinparam ranksep 90
+
+title Контейнеры экосистемы «Тёплый дом»
+
+Person(user, "Пользователь", "Владелец дома")
+Person(support, "Сотрудник поддержки", "Оператор")
+
+System_Ext(iot, "Устройства в доме", "Датчики, реле, лампы, камеры, замки, ворота")
+System_Ext(payments, "Payment Provider", "Stripe / CloudPayments")
+System_Ext(channels, "Notification Channels", "Email / SMS / push")
+
+System_Boundary(warmhouse, "Экосистема «Тёплый дом»") {
+
+    Container(web, "Web App", "", "Управление домом, сценарии, биллинг")
+    Container(mobile, "Mobile App", "", "Управление с телефона")
+    Container(support_web, "Support Web", "", "Дашборды для поддержки")
+
+    Container_Boundary(smart_home, "Smart Home Management") {
+        Container(devices_svc, "Devices Service", "", "Каталог и lifecycle устройств")
+        Container(climate_svc, "Climate Service", "", "Отопление и телеметрия")
+        Container(lighting_svc, "Lighting Service", "", "Освещение и сцены")
+        Container(security_svc, "Security Service", "", "Видеонаблюдение, замки")
+        Container(automation_svc, "Automation Service", "", "Сценарии и оркестрация")
+    }
+
+    Container_Boundary(iam_d, "Identity & Access") {
+        Container(iam_svc, "IAM Service", "", "Аутентификация, RBAC")
+    }
+
+    Container_Boundary(commerce, "Commerce") {
+        Container(billing_svc, "Billing Service", "", "Подписки, платежи")
+    }
+
+    Container_Boundary(comms, "Communications") {
+        Container(notifications_svc, "Notifications Service", "", "Доставка уведомлений")
+    }
+
+    Container_Boundary(observ, "Observability") {
+        Container(analytics_svc, "Analytics Service", "", "Дашборды поддержки")
+    }
+
+    ContainerQueue(broker, "Message Broker", "Kafka", "Доменные события")
+    ContainerDb(db, "Database", "PostgreSQL", "Транзакционные данные")
+}
+
+' === Пользователи → клиенты ===
+Rel(user, web, "Использует", "HTTPS")
+Rel(user, mobile, "Использует", "HTTPS")
+Rel(support, support_web, "Использует", "HTTPS")
+
+' === Клиенты → доменные группы (REST) ===
+Rel(web, smart_home, "Управление домом", "REST")
+Rel(web, iam_d, "Auth", "REST")
+Rel(web, commerce, "Биллинг", "REST")
+Rel(mobile, smart_home, "Управление домом", "REST")
+Rel(mobile, iam_d, "Auth", "REST")
+Rel(mobile, commerce, "Биллинг", "REST")
+Rel(support_web, iam_d, "Auth", "REST")
+Rel(support_web, observ, "Дашборды", "REST")
+
+' === IoT-устройства ===
+Rel(iot, smart_home, "Телеметрия / команды", "MQTT")
+
+' === Внутренняя оркестрация ===
+Rel(automation_svc, climate_svc, "Команды", "REST")
+Rel(automation_svc, lighting_svc, "Команды", "REST")
+Rel(automation_svc, security_svc, "Команды", "REST")
+
+' === События в Kafka ===
+Rel(smart_home, broker, "Pub/Sub", "Kafka")
+Rel(iam_d, broker, "Publish", "Kafka")
+Rel(commerce, broker, "Publish", "Kafka")
+Rel(comms, broker, "Subscribe", "Kafka")
+Rel(observ, broker, "Subscribe", "Kafka")
+
+' === Persistence ===
+Rel(smart_home, db, "Read/Write", "SQL")
+Rel(iam_d, db, "Read/Write", "SQL")
+Rel(commerce, db, "Read/Write", "SQL")
+Rel(comms, db, "Read/Write", "SQL")
+Rel(observ, db, "Read/Write", "SQL")
+
+' === Внешние интеграции ===
+Rel(billing_svc, payments, "Платежи", "REST")
+Rel(notifications_svc, channels, "Доставка", "REST / SMTP")
+
+SHOW_LEGEND()
+@enduml

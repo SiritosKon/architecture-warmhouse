@@ -1,0 +1,27 @@
+@startuml climate
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Climate Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+Container(iot_gw, "Шлюз устройств", "MQTT", "Шлюз связи с физическими устройствами")
+ContainerQueue(broker, "Message Broker", "Kafka", "События и телеметрия")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(climate, "Climate Service") {
+    Component(api, "Climate REST API", "", "HTTP-эндпоинты сервиса")
+    Component(controller, "Heating Controller", "", "Вкл/выкл, целевая температура")
+    Component(telemetry, "Telemetry Processor", "", "Приём телеметрии, проверка порогов, история")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, controller, "Использует")
+Rel(api, telemetry, "История температур")
+Rel(controller, iot_gw, "Команды реле", "REST")
+Rel(controller, db, "Read/Write", "SQL")
+Rel(controller, broker, "climate-события", "Kafka")
+Rel(telemetry, broker, "Subscribe telemetry", "Kafka")
+Rel(telemetry, db, "Read/Write", "SQL")
+
+SHOW_LEGEND()
+@enduml

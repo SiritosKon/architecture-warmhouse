@@ -1,0 +1,22 @@
+@startuml iam
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — IAM Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация и валидация JWT")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(iam, "IAM Service") {
+    Component(api, "IAM REST API", "", "Регистрация, login, выдача JWT")
+    Component(auth, "Authentication", "", "Проверка credentials, выдача токенов")
+    Component(authz, "Authorization (RBAC)", "", "Роли и права, владение объектами")
+}
+
+Rel(api_gw, api, "Запросы и проверка токенов", "JSON/HTTPS")
+Rel(api, auth, "Использует")
+Rel(api, authz, "Использует")
+Rel(auth, db, "Read/Write", "SQL")
+Rel(authz, db, "Read", "SQL")
+
+SHOW_LEGEND()
+@enduml

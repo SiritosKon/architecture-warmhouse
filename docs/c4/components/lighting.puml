@@ -1,0 +1,27 @@
+@startuml lighting
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Lighting Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+Container(iot_gw, "Шлюз устройств", "MQTT", "Шлюз связи с физическими устройствами")
+ContainerQueue(broker, "Message Broker", "Kafka", "Доменные события")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(lighting, "Lighting Service") {
+    Component(api, "Lighting REST API", "", "HTTP-эндпоинты сервиса")
+    Component(controller, "Lighting Controller", "", "Вкл/выкл, диммирование, цвет")
+    Component(scenes, "Scenes Manager", "", "Создание и активация световых сцен")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, controller, "Использует")
+Rel(api, scenes, "Использует")
+Rel(controller, iot_gw, "Команды лампам", "REST")
+Rel(scenes, iot_gw, "Активация сцены", "REST")
+Rel(controller, db, "Read/Write", "SQL")
+Rel(scenes, db, "Read/Write", "SQL")
+Rel(controller, broker, "lighting-события", "Kafka")
+
+SHOW_LEGEND()
+@enduml

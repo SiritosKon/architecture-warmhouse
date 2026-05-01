@@ -1,0 +1,23 @@
+@startuml analytics
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Analytics Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов Support Web")
+ContainerQueue(broker, "Message Broker", "Kafka", "События всех сервисов")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(analytics, "Analytics Service") {
+    Component(api, "Analytics REST API", "", "Эндпоинты для Support Web")
+    Component(aggregator, "Event Aggregator", "", "Слушает события и считает агрегаты")
+    Component(dashboards, "Dashboards", "", "Готовит данные для дашбордов")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, dashboards, "Использует")
+Rel(aggregator, broker, "Subscribe", "Kafka")
+Rel(aggregator, db, "Write агрегатов", "SQL")
+Rel(dashboards, db, "Read", "SQL")
+
+SHOW_LEGEND()
+@enduml

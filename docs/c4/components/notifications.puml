@@ -1,0 +1,23 @@
+@startuml notifications
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Notifications Service
+
+ContainerQueue(broker, "Message Broker", "Kafka", "notification.requested от всех сервисов")
+ContainerDb(db, "Database", "PostgreSQL")
+System_Ext(channels, "Notification Channels", "SendGrid / Twilio / FCM / APNs")
+
+Container_Boundary(notifications, "Notifications Service") {
+    Component(subscriber, "Event Subscriber", "", "Слушает события из брокера")
+    Component(router, "Notification Router", "", "Выбирает канал, рендерит шаблон")
+    Component(channels_adapter, "Channel Adapters", "", "Email / SMS / Push")
+}
+
+Rel(subscriber, broker, "Subscribe", "Kafka")
+Rel(subscriber, router, "Передаёт событие")
+Rel(router, db, "Read шаблонов и настроек, Write журнала", "SQL")
+Rel(router, channels_adapter, "Доставка")
+Rel(channels_adapter, channels, "REST / SMTP")
+
+SHOW_LEGEND()
+@enduml
