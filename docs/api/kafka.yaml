@@ -1,0 +1,323 @@
+asyncapi: '2.6.0'
+info:
+  title: Warmhouse Events
+  version: 1.0.0
+  description: |
+    Доменные события экосистемы «Тёплый дом», передаваемые через Apache Kafka.
+    Каждый канал — отдельный Kafka-топик. Producer'ы и subscriber'ы соответствуют
+    стрелкам на C4 Container и Component диаграммах.
+
+defaultContentType: application/json
+
+servers:
+  production:
+    url: kafka.warmhouse.example.com:9092
+    protocol: kafka
+    description: Production Kafka cluster
+
+channels:
+  device.bound:
+    description: Устройство привязано к дому/комнате (publish — Devices Service)
+    publish:
+      operationId: publishDeviceBound
+      summary: Devices → событие о новом устройстве
+      message: { $ref: '#/components/messages/DeviceBound' }
+    subscribe:
+      operationId: consumeDeviceBound
+      summary: Climate / Lighting / Security / Automation подписаны для инициализации состояния
+      message: { $ref: '#/components/messages/DeviceBound' }
+
+  device.lifecycle:
+    description: Online/offline/decommission устройства
+    publish:
+      operationId: publishDeviceLifecycle
+      summary: Devices → lifecycle-событие
+      message: { $ref: '#/components/messages/DeviceLifecycle' }
+
+  climate.telemetry:
+    description: Поток измерений температуры от термостатов
+    publish:
+      operationId: publishClimateTelemetry
+      summary: Шлюз устройств → телеметрия
+      message: { $ref: '#/components/messages/ClimateTelemetry' }
+    subscribe:
+      operationId: consumeClimateTelemetry
+      summary: Climate (telemetry processor) и Analytics подписаны
+      message: { $ref: '#/components/messages/ClimateTelemetry' }
+
+  climate.events:
+    description: События отопления (порог достигнут, цель изменена)
+    publish:
+      operationId: publishClimateEvents
+      message: { $ref: '#/components/messages/ClimateEvent' }
+
+  lighting.events:
+    description: Изменения состояния ламп (включена, цвет/яркость)
+    publish:
+      operationId: publishLightingEvents
+      message: { $ref: '#/components/messages/LightingEvent' }
+
+  security.access:
+    description: Замки/ворота открыты-закрыты, попытки доступа
+    publish:
+      operationId: publishSecurityAccess
+      message: { $ref: '#/components/messages/SecurityAccessEvent' }
+
+  security.surveillance:
+    description: События видеонаблюдения (детекция движения, объекты)
+    publish:
+      operationId: publishSurveillance
+      message: { $ref: '#/components/messages/SurveillanceEvent' }
+
+  billing.payment:
+    description: Платёж прошёл/не прошёл, подписка продлена
+    publish:
+      operationId: publishBillingPayment
+      message: { $ref: '#/components/messages/BillingPaymentEvent' }
+
+  notification.requested:
+    description: |
+      Запрос на отправку уведомления. Publisher'ы — все сервисы, которым нужно
+      сообщить пользователю (Climate, Security, Billing, Automation).
+      Subscriber — Notifications Service.
+    publish:
+      operationId: publishNotificationRequested
+      summary: Любой сервис → запрос на уведомление
+      message: { $ref: '#/components/messages/NotificationRequested' }
+    subscribe:
+      operationId: consumeNotificationRequested
+      summary: Notifications Service подписан и доставляет по каналам
+      message: { $ref: '#/components/messages/NotificationRequested' }
+
+  automation.scenario_triggered:
+    description: Сценарий сработал — для аналитики и истории
+    publish:
+      operationId: publishScenarioTriggered
+      message: { $ref: '#/components/messages/ScenarioTriggered' }
+
+components:
+  messages:
+    DeviceBound:
+      name: DeviceBound
+      title: Устройство привязано
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/DeviceBoundPayload' }
+      examples:
+        - name: thermostat
+          payload:
+            deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+            type: THERMOSTAT
+            houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+            roomId: 1a2b3c4d-aaaa-bbbb-cccc-ddddeeeeffff
+            ts: '2026-04-30T12:00:00Z'
+
+    DeviceLifecycle:
+      name: DeviceLifecycle
+      title: Lifecycle устройства
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/DeviceLifecyclePayload' }
+      examples:
+        - name: offline
+          payload:
+            deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+            event: offline
+            ts: '2026-04-30T12:30:00Z'
+
+    ClimateTelemetry:
+      name: ClimateTelemetry
+      title: Телеметрия температуры
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ClimateTelemetryPayload' }
+      examples:
+        - name: reading
+          payload:
+            deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+            value: 21.4
+            unit: celsius
+            ts: '2026-04-30T12:05:00Z'
+
+    ClimateEvent:
+      name: ClimateEvent
+      title: Событие отопления
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ClimateEventPayload' }
+
+    LightingEvent:
+      name: LightingEvent
+      title: Событие лампы
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/LightingEventPayload' }
+
+    SecurityAccessEvent:
+      name: SecurityAccessEvent
+      title: Событие доступа
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/SecurityAccessEventPayload' }
+      examples:
+        - name: door_unlocked
+          payload:
+            deviceId: bbbbbbbb-cccc-dddd-eeee-ffffffffffff
+            event: door.unlocked
+            actor: { type: user, id: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2 }
+            ts: '2026-04-30T12:15:00Z'
+
+    SurveillanceEvent:
+      name: SurveillanceEvent
+      title: Событие видеонаблюдения
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/SurveillanceEventPayload' }
+
+    BillingPaymentEvent:
+      name: BillingPaymentEvent
+      title: Платёжное событие
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/BillingPaymentPayload' }
+      examples:
+        - name: succeeded
+          payload:
+            event: payment.succeeded
+            paymentId: 55555555-6666-7777-8888-999999999999
+            subscriptionId: 44444444-5555-6666-7777-888888888888
+            userId: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+            amount: 499
+            currency: RUB
+            ts: '2026-04-30T12:00:00Z'
+
+    NotificationRequested:
+      name: NotificationRequested
+      title: Запрос на уведомление
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/NotificationRequestedPayload' }
+      examples:
+        - name: payment_succeeded
+          payload:
+            recipientUserId: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+            template: payment.succeeded
+            channels: [email, push]
+            params:
+              amount: 499
+              currency: RUB
+              periodEnd: '2026-05-30T00:00:00Z'
+            ts: '2026-04-30T12:00:01Z'
+
+    ScenarioTriggered:
+      name: ScenarioTriggered
+      title: Сценарий сработал
+      contentType: application/json
+      payload: { $ref: '#/components/schemas/ScenarioTriggeredPayload' }
+
+  schemas:
+    DeviceBoundPayload:
+      type: object
+      required: [deviceId, type, houseId, roomId, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        type: { type: string, enum: [THERMOSTAT, LAMP, CAMERA, LOCK, GATE, SENSOR] }
+        houseId: { type: string, format: uuid }
+        roomId: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+
+    DeviceLifecyclePayload:
+      type: object
+      required: [deviceId, event, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        event: { type: string, enum: [online, offline, decommissioned] }
+        ts: { type: string, format: date-time }
+
+    ClimateTelemetryPayload:
+      type: object
+      required: [deviceId, value, unit, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        value: { type: number, format: float }
+        unit: { type: string, enum: [celsius] }
+        ts: { type: string, format: date-time }
+
+    ClimateEventPayload:
+      type: object
+      required: [deviceId, event, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        event:
+          type: string
+          enum: [target.changed, threshold.high, threshold.low, power.on, power.off]
+        targetTemp: { type: number, format: float }
+        ts: { type: string, format: date-time }
+
+    LightingEventPayload:
+      type: object
+      required: [deviceId, event, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        event: { type: string, enum: [power.on, power.off, brightness.changed, color.changed] }
+        brightness: { type: integer, minimum: 0, maximum: 100 }
+        color: { type: string }
+        ts: { type: string, format: date-time }
+
+    SecurityAccessEventPayload:
+      type: object
+      required: [deviceId, event, ts]
+      properties:
+        deviceId: { type: string, format: uuid }
+        event:
+          type: string
+          enum: [door.locked, door.unlocked, door.closed_armed, gate.opened, gate.closed, access.denied]
+        actor:
+          type: object
+          properties:
+            type: { type: string, enum: [user, scenario, schedule] }
+            id: { type: string }
+        ts: { type: string, format: date-time }
+
+    SurveillanceEventPayload:
+      type: object
+      required: [cameraId, event, ts]
+      properties:
+        cameraId: { type: string, format: uuid }
+        event: { type: string, enum: [motion.detected, person.detected, vehicle.detected] }
+        snapshotUrl: { type: string, format: uri }
+        ts: { type: string, format: date-time }
+
+    BillingPaymentPayload:
+      type: object
+      required: [event, paymentId, ts]
+      properties:
+        event:
+          type: string
+          enum: [payment.succeeded, payment.failed, subscription.renewed, subscription.canceled]
+        paymentId: { type: string, format: uuid }
+        subscriptionId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        amount: { type: integer }
+        currency: { type: string }
+        ts: { type: string, format: date-time }
+
+    NotificationRequestedPayload:
+      type: object
+      required: [recipientUserId, template, channels, ts]
+      properties:
+        recipientUserId: { type: string, format: uuid }
+        template:
+          type: string
+          description: Идентификатор шаблона (например, `payment.succeeded`, `device.offline`, `scenario.triggered`)
+        channels:
+          type: array
+          items: { type: string, enum: [email, sms, push] }
+        params:
+          type: object
+          additionalProperties: true
+          description: Параметры рендера шаблона
+        ts: { type: string, format: date-time }
+
+    ScenarioTriggeredPayload:
+      type: object
+      required: [scenarioId, houseId, ts, status]
+      properties:
+        scenarioId: { type: string, format: uuid }
+        houseId: { type: string, format: uuid }
+        executionId: { type: string, format: uuid }
+        status: { type: string, enum: [success, partial, failed] }
+        actionsTotal: { type: integer }
+        actionsFailed: { type: integer }
+        ts: { type: string, format: date-time }

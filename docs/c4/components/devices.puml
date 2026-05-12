@@ -1,0 +1,24 @@
+@startuml devices
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Devices Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+ContainerQueue(broker, "Message Broker", "Kafka", "Доменные события")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(devices, "Devices Service") {
+    Component(api, "Devices REST API", "", "HTTP-эндпоинты сервиса")
+    Component(catalog, "Catalog", "", "Каталог устройств и комплектов")
+    Component(lifecycle, "Device Lifecycle Manager", "", "Provisioning, онлайн/офлайн, прошивки, отвязка")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, catalog, "Использует")
+Rel(api, lifecycle, "Использует")
+Rel(catalog, db, "Read", "SQL")
+Rel(lifecycle, db, "Read/Write", "SQL")
+Rel(lifecycle, broker, "device.bound, lifecycle-события", "Kafka")
+
+SHOW_LEGEND()
+@enduml

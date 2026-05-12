@@ -1,0 +1,1683 @@
+openapi: 3.0.3
+info:
+  title: Warmhouse Public API
+  version: 1.0.0
+
+servers:
+  - url: https://api.warmhouse.example.com
+
+tags:
+  - name: IAM
+  - name: Devices
+  - name: Climate
+  - name: Lighting
+  - name: Security
+  - name: Automation
+  - name: Billing
+  - name: Analytics
+
+paths:
+
+  # ============================================================
+  # IAM
+  # ============================================================
+
+  /auth/register:
+    post:
+      tags: [IAM]
+      summary: Регистрация нового пользователя
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+            examples:
+              default:
+                value:
+                  email: ivan@example.com
+                  password: "S3cret!Pass"
+                  name: Иван Петров
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+              examples:
+                default:
+                  value:
+                    accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    refreshToken: 8b3f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                    expiresIn: 3600
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                default:
+                  value: { code: USER_ALREADY_EXISTS, message: Пользователь с таким email уже зарегистрирован }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/login:
+    post:
+      tags: [IAM]
+      summary: Аутентификация по email/password
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            examples:
+              default:
+                value:
+                  email: ivan@example.com
+                  password: "S3cret!Pass"
+      responses:
+        '200':
+          description: Успешный вход — выданы токены
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+              examples:
+                default:
+                  value:
+                    accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    refreshToken: 8b3f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                    expiresIn: 3600
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                default:
+                  value: { code: INVALID_CREDENTIALS, message: Неверный email или пароль }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /auth/logout:
+    post:
+      tags: [IAM]
+      summary: Завершение сессии (инвалидация refresh-токена)
+      operationId: logout
+      responses:
+        '204':
+          description: Сессия завершена
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/{id}:
+    get:
+      tags: [IAM]
+      summary: Получить профиль пользователя
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+              examples:
+                default:
+                  value:
+                    id: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+                    email: ivan@example.com
+                    name: Иван Петров
+                    role: owner
+                    createdAt: '2026-04-30T10:15:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [IAM]
+      summary: Обновить профиль
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string }
+                phone: { type: string }
+            examples:
+              default:
+                value:
+                  name: Иван Петров-Сидоров
+                  phone: '+79991234567'
+      responses:
+        '200':
+          description: Профиль обновлён
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Devices
+  # ============================================================
+
+  /devices:
+    get:
+      tags: [Devices]
+      summary: Список устройств (с фильтрами)
+      operationId: listDevices
+      parameters:
+        - in: query
+          name: houseId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: roomId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: type
+          schema: { $ref: '#/components/schemas/DeviceType' }
+      responses:
+        '200':
+          description: Список устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Device' }
+              examples:
+                default:
+                  value:
+                    - id: 0a1b2c3d-1111-2222-3333-444455556666
+                      type: THERMOSTAT
+                      name: Термостат — гостиная
+                      houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                      roomId: 1a2b3c4d-aaaa-bbbb-cccc-ddddeeeeffff
+                      status: online
+                      lifecycle: active
+                      createdAt: '2026-03-12T08:30:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Devices]
+      summary: Provisioning — регистрация устройства в реестре
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterDeviceRequest' }
+            examples:
+              default:
+                value:
+                  type: THERMOSTAT
+                  name: Термостат — гостиная
+                  houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                  roomId: 1a2b3c4d-aaaa-bbbb-cccc-ddddeeeeffff
+                  pairingCode: A1B2-C3D4
+      responses:
+        '201':
+          description: Устройство зарегистрировано
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Устройство с таким pairingCode уже привязано
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /devices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    get:
+      tags: [Devices]
+      summary: Получить устройство
+      operationId: getDevice
+      responses:
+        '200':
+          description: Карточка устройства
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+              examples:
+                default:
+                  value:
+                    id: 0a1b2c3d-1111-2222-3333-444455556666
+                    type: THERMOSTAT
+                    name: Термостат — гостиная
+                    houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                    roomId: 1a2b3c4d-aaaa-bbbb-cccc-ddddeeeeffff
+                    status: online
+                    lifecycle: active
+                    createdAt: '2026-03-12T08:30:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Devices]
+      summary: Обновить метаданные устройства (имя, комната, привязка к дому)
+      operationId: updateDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateDeviceRequest' }
+            examples:
+              rename:
+                summary: Переименовать устройство
+                value:
+                  name: Термостат — спальня
+              moveRoom:
+                summary: Переставить в другую комнату того же дома
+                value:
+                  roomId: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+              transferHouse:
+                summary: Перенести устройство в другой дом (с новой комнатой)
+                value:
+                  houseId: cccccccc-dddd-eeee-ffff-000011112222
+                  roomId: 33334444-5555-6666-7777-888899990000
+                  name: Термостат — дача, кухня
+              fullUpdate:
+                summary: Обновить все изменяемые поля сразу
+                value:
+                  name: Термостат — гостиная (новый владелец)
+                  houseId: cccccccc-dddd-eeee-ffff-000011112222
+                  roomId: 33334444-5555-6666-7777-888899990000
+      responses:
+        '200':
+          description: Устройство обновлено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Devices]
+      summary: Decommission — отвязать устройство
+      operationId: decommissionDevice
+      responses:
+        '204':
+          description: Устройство удалено из реестра
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Climate
+  # ============================================================
+
+  /climate/devices/{id}/state:
+    get:
+      tags: [Climate]
+      summary: Текущее состояние термостата
+      operationId: getClimateDeviceState
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Состояние термостата
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThermostatState' }
+              examples:
+                heating:
+                  summary: Термостат включён, греет до 22°C
+                  value:
+                    deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                    status: online
+                    isPending: false
+                    isEnabled: true
+                    targetTemp: 22.0
+                    currentTemp: 21.4
+                    updatedAt: '2026-04-30T12:05:00Z'
+                changingTarget:
+                  summary: Команда только что отправлена — устройство применяет настройки
+                  value:
+                    deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                    status: online
+                    isPending: true
+                    isEnabled: true
+                    targetTemp: 24.0
+                    currentTemp: 21.4
+                    updatedAt: '2026-04-30T12:06:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /climate/devices/{id}/command:
+    post:
+      tags: [Climate]
+      summary: Изменить состояние термостата (включить/выключить, поставить целевую температуру)
+      operationId: sendClimateCommand
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThermostatCommand' }
+            examples:
+              setTemperature:
+                summary: Только сменить целевую температуру
+                value:
+                  targetTemp: 22.5
+              powerOff:
+                summary: Выключить отопление
+                value:
+                  isEnabled: false
+              setBoth:
+                summary: Включить и сразу выставить температуру
+                value:
+                  isEnabled: true
+                  targetTemp: 24.0
+      responses:
+        '202':
+          description: Команда принята к исполнению
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommandAccepted' }
+              examples:
+                default:
+                  value:
+                    commandId: 5f6e7d8c-9999-aaaa-bbbb-cccccccccccc
+                    acceptedAt: '2026-04-30T12:06:00Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Устройство офлайн, команда не доставлена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                default:
+                  value: { code: DEVICE_OFFLINE, message: Устройство недоступно }
+
+  /climate/devices/{id}/telemetry:
+    get:
+      tags: [Climate]
+      summary: История температур по устройству
+      operationId: getDeviceTelemetry
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: granularity
+          schema:
+            type: string
+            enum: [minute, hour, day]
+            default: hour
+      responses:
+        '200':
+          description: Точки телеметрии
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TelemetryPoint' }
+              examples:
+                default:
+                  value:
+                    - ts: '2026-04-30T11:00:00Z'
+                      value: 21.1
+                    - ts: '2026-04-30T12:00:00Z'
+                      value: 21.4
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /climate/houses/{houseId}/summary:
+    get:
+      tags: [Climate]
+      summary: Сводка по дому (средняя температура, активные устройства)
+      operationId: getHouseClimateSummary
+      parameters:
+        - in: path
+          name: houseId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Агрегированная сводка по дому
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseSummary' }
+              examples:
+                default:
+                  value:
+                    houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                    avgTemp: 21.6
+                    activeDevices: 4
+                    devicesOnline: 4
+                    devicesOffline: 0
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Lighting
+  # ============================================================
+
+  /lighting/devices/{id}/state:
+    get:
+      tags: [Lighting]
+      summary: Текущее состояние лампы
+      operationId: getLampState
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Состояние лампы
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LampState' }
+              examples:
+                default:
+                  value:
+                    deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                    status: online
+                    isPending: false
+                    isEnabled: true
+                    brightness: 80
+                    color: '#FFD27F'
+                    updatedAt: '2026-04-30T12:05:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /lighting/devices/{id}/command:
+    post:
+      tags: [Lighting]
+      summary: Изменить состояние лампы (включить/выключить, яркость, цвет)
+      operationId: sendLampCommand
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LampCommand' }
+            examples:
+              dim:
+                summary: Приглушить и сменить цвет
+                value:
+                  isEnabled: true
+                  brightness: 40
+                  color: '#FF8C42'
+              off:
+                summary: Выключить
+                value:
+                  isEnabled: false
+              brightnessOnly:
+                summary: Только сменить яркость
+                value:
+                  brightness: 100
+      responses:
+        '202':
+          description: Команда принята
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommandAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: Устройство офлайн
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /lighting/scenes:
+    get:
+      tags: [Lighting]
+      summary: Список сцен дома
+      operationId: listScenes
+      parameters:
+        - in: query
+          name: houseId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Список сцен
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Scene' }
+              examples:
+                default:
+                  value:
+                    - id: 11111111-2222-3333-4444-555555555555
+                      name: Вечер
+                      houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                      lamps:
+                        - deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                          status: online
+                          isPending: false
+                          isEnabled: true
+                          brightness: 30
+                          color: '#FF8C42'
+                          updatedAt: '2026-04-30T12:05:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Lighting]
+      summary: Создать сцену
+      operationId: createScene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSceneRequest' }
+            examples:
+              default:
+                value:
+                  name: Вечер
+                  houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                  lamps:
+                    - deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                      status: online
+                      isPending: false
+                      isEnabled: true
+                      brightness: 30
+                      color: '#FF8C42'
+                      updatedAt: '2026-04-30T12:05:00Z'
+      responses:
+        '201':
+          description: Сцена создана
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scene' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /lighting/scenes/{id}/activate:
+    post:
+      tags: [Lighting]
+      summary: Активировать сцену
+      operationId: activateScene
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Сцена применяется к лампам
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sceneId: { type: string, format: uuid }
+                  affectedLamps: { type: integer }
+              examples:
+                default:
+                  value:
+                    sceneId: 11111111-2222-3333-4444-555555555555
+                    affectedLamps: 4
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Security
+  # ============================================================
+
+  /security/cameras/{id}/stream:
+    get:
+      tags: [Security]
+      summary: Получить ссылку на live-stream камеры
+      operationId: getCameraStream
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Подписанная ссылка на HLS-стрим
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [streamUrl, expiresAt]
+                properties:
+                  streamUrl: { type: string, format: uri }
+                  expiresAt: { type: string, format: date-time }
+              examples:
+                default:
+                  value:
+                    streamUrl: https://stream.warmhouse.example.com/cam/0a1b2c3d/hls.m3u8?token=...
+                    expiresAt: '2026-04-30T13:00:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /security/cameras/{id}/events:
+    get:
+      tags: [Security]
+      summary: События детекции движения за период
+      operationId: listCameraEvents
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Список событий
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CameraEvent' }
+              examples:
+                default:
+                  value:
+                    - id: 22222222-3333-4444-5555-666666666666
+                      cameraId: 0a1b2c3d-1111-2222-3333-444455556666
+                      ts: '2026-04-30T11:30:00Z'
+                      type: motion
+                      snapshotUrl: https://media.warmhouse.example.com/snap/22222222.jpg
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /security/locks/{id}/command:
+    post:
+      tags: [Security]
+      summary: Открыть/закрыть замок или ворота
+      operationId: sendLockCommand
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/LockSettings'
+                - type: object
+                  required: [isOpen]
+            examples:
+              unlock:
+                summary: Открыть замок
+                value:
+                  isOpen: true
+              lock:
+                summary: Закрыть замок
+                value:
+                  isOpen: false
+      responses:
+        '202':
+          description: Команда принята
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommandAccepted' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Недостаточно прав на это устройство
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                default:
+                  value: { code: ACCESS_DENIED, message: Нет прав на это устройство }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /security/access-grants:
+    get:
+      tags: [Security]
+      summary: Список выданных прав доступа в дом
+      operationId: listAccessGrants
+      parameters:
+        - in: query
+          name: houseId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Список грантов
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AccessGrant' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Security]
+      summary: Выдать гостевой доступ
+      operationId: createAccessGrant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAccessGrantRequest' }
+            examples:
+              default:
+                value:
+                  houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                  granteeEmail: guest@example.com
+                  role: guest
+                  validFrom: '2026-05-01T00:00:00Z'
+                  validUntil: '2026-05-03T23:59:59Z'
+                  devices:
+                    - 0a1b2c3d-1111-2222-3333-444455556666
+      responses:
+        '201':
+          description: Грант создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccessGrant' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Только владелец дома может выдавать гостевой доступ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ============================================================
+  # Automation
+  # ============================================================
+
+  /scenarios:
+    get:
+      tags: [Automation]
+      summary: Список сценариев
+      operationId: listScenarios
+      parameters:
+        - in: query
+          name: houseId
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: enabled
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Список сценариев
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Scenario' }
+              examples:
+                default:
+                  value:
+                    - id: 33333333-4444-5555-6666-777777777777
+                      name: Ушёл из дома
+                      houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                      enabled: true
+                      trigger:
+                        type: device.event
+                        topic: security.access
+                        match: { event: door.closed_armed }
+                      actions:
+                        - { service: lighting, action: scene.activate, params: { sceneId: 11111111-2222-3333-4444-555555555555 } }
+                        - { service: climate, action: set_temperature, params: { houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1, targetTemp: 18 } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Automation]
+      summary: Создать сценарий
+      operationId: createScenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateScenarioRequest' }
+            examples:
+              default:
+                value:
+                  name: Ушёл из дома
+                  houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1
+                  trigger:
+                    type: device.event
+                    topic: security.access
+                    match: { event: door.closed_armed }
+                  actions:
+                    - { service: lighting, action: scene.activate, params: { sceneId: 11111111-2222-3333-4444-555555555555 } }
+                    - { service: climate, action: set_temperature, params: { houseId: 7d4f0e3a-2c1e-4f93-9a9b-8b7d2a01a3e1, targetTemp: 18 } }
+      responses:
+        '201':
+          description: Сценарий создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scenario' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /scenarios/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ScenarioId'
+    get:
+      tags: [Automation]
+      summary: Получить сценарий
+      operationId: getScenario
+      responses:
+        '200':
+          description: Сценарий
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scenario' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Automation]
+      summary: Обновить сценарий (включая enabled)
+      operationId: updateScenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string }
+                enabled: { type: boolean }
+                trigger: { $ref: '#/components/schemas/Trigger' }
+                actions:
+                  type: array
+                  items: { $ref: '#/components/schemas/Action' }
+            examples:
+              disable:
+                value: { enabled: false }
+      responses:
+        '200':
+          description: Сценарий обновлён
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Scenario' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Automation]
+      summary: Удалить сценарий
+      operationId: deleteScenario
+      responses:
+        '204':
+          description: Сценарий удалён
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /scenarios/{id}/run:
+    post:
+      tags: [Automation]
+      summary: Ручной запуск сценария
+      operationId: runScenario
+      parameters:
+        - $ref: '#/components/parameters/ScenarioId'
+      responses:
+        '202':
+          description: Сценарий поставлен в исполнение
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executionId: { type: string, format: uuid }
+              examples:
+                default:
+                  value: { executionId: 99999999-aaaa-bbbb-cccc-dddddddddddd }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Сценарий выключен (enabled=false)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /scenarios/{id}/history:
+    get:
+      tags: [Automation]
+      summary: История срабатываний
+      operationId: getScenarioHistory
+      parameters:
+        - $ref: '#/components/parameters/ScenarioId'
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Список срабатываний
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ScenarioRun' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ============================================================
+  # Billing
+  # ============================================================
+
+  /subscriptions:
+    get:
+      tags: [Billing]
+      summary: Список подписок пользователя
+      operationId: listSubscriptions
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Список подписок (включая истёкшие)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Subscription' }
+              examples:
+                default:
+                  value:
+                    - id: 44444444-5555-6666-7777-888888888888
+                      userId: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+                      planCode: pro_monthly
+                      status: active
+                      startedAt: '2026-04-01T00:00:00Z'
+                      currentPeriodEnd: '2026-05-01T00:00:00Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Billing]
+      summary: Оформить подписку
+      operationId: createSubscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSubscriptionRequest' }
+            examples:
+              default:
+                value:
+                  userId: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+                  planCode: pro_monthly
+                  paymentMethodId: pm_1NXk9L2eZvKYlo2C
+      responses:
+        '201':
+          description: Подписка создана, первый платёж списан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402':
+          description: Платёж отклонён провайдером
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                default:
+                  value: { code: PAYMENT_DECLINED, message: Карта отклонена }
+
+  /subscriptions/{id}:
+    delete:
+      tags: [Billing]
+      summary: Отменить подписку (до конца оплаченного периода активна)
+      operationId: cancelSubscription
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Подписка переведена в статус canceled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /payments:
+    get:
+      tags: [Billing]
+      summary: История платежей пользователя
+      operationId: listPayments
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Платежи
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Payment' }
+              examples:
+                default:
+                  value:
+                    - id: 55555555-6666-7777-8888-999999999999
+                      subscriptionId: 44444444-5555-6666-7777-888888888888
+                      amount: 499
+                      currency: RUB
+                      status: succeeded
+                      paidAt: '2026-04-01T00:00:05Z'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /payments/webhook:
+    post:
+      tags: [Billing]
+      summary: Webhook от платёжного провайдера
+      operationId: paymentWebhook
+      security: []
+      parameters:
+        - in: header
+          name: X-Signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentWebhookEvent' }
+            examples:
+              succeeded:
+                value:
+                  event: payment.succeeded
+                  paymentId: pi_1NXk9L2eZvKYlo2C
+                  subscriptionId: 44444444-5555-6666-7777-888888888888
+                  amount: 499
+                  currency: RUB
+                  ts: '2026-04-30T12:00:00Z'
+      responses:
+        '200':
+          description: Событие принято
+        '400':
+          description: Невалидная подпись или payload
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ============================================================
+  # Analytics (Support Web only)
+  # ============================================================
+
+  /analytics/dashboards/devices-fleet:
+    get:
+      tags: [Analytics]
+      summary: Состояние парка устройств (online/offline по типам)
+      operationId: getDeviceFleet
+      responses:
+        '200':
+          description: Срез по парку устройств на текущий момент
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceFleet' }
+              examples:
+                default:
+                  value:
+                    total: 12340
+                    online: 11890
+                    offline: 450
+                    byType:
+                      THERMOSTAT: { online: 4500, offline: 120 }
+                      LAMP: { online: 5200, offline: 180 }
+                      CAMERA: { online: 1300, offline: 80 }
+                      LOCK: { online: 890, offline: 70 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /analytics/dashboards/incidents:
+    get:
+      tags: [Analytics]
+      summary: Инциденты за период (упавшие сценарии, отказавшие устройства)
+      operationId: listIncidents
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: severity
+          schema: { type: string, enum: [low, medium, high, critical] }
+      responses:
+        '200':
+          description: Список инцидентов
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Incident' }
+              examples:
+                default:
+                  value:
+                    - id: 66666666-7777-8888-9999-aaaaaaaaaaaa
+                      ts: '2026-04-30T11:30:00Z'
+                      severity: high
+                      service: climate
+                      summary: Высокий процент офлайн-термостатов в регионе MSK
+                      affectedHouses: 42
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /analytics/telemetry/anomalies:
+    get:
+      tags: [Analytics]
+      summary: Аномалии в телеметрии (резкие скачки температуры, потери сигнала)
+      operationId: listTelemetryAnomalies
+      parameters:
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Список аномалий
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Anomaly' }
+              examples:
+                default:
+                  value:
+                    - id: 77777777-8888-9999-aaaa-bbbbbbbbbbbb
+                      ts: '2026-04-30T10:15:00Z'
+                      deviceId: 0a1b2c3d-1111-2222-3333-444455556666
+                      kind: temperature_spike
+                      value: 38.2
+                      expectedRange: { from: 18, to: 26 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /analytics/users/{id}/activity-summary:
+    get:
+      tags: [Analytics]
+      summary: Сводка активности пользователя (для разбора жалоб)
+      operationId: getUserActivitySummary
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: from
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Активность пользователя
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserActivitySummary' }
+              examples:
+                default:
+                  value:
+                    userId: 4f2c1d2a-9c2c-4d3a-9a51-1f3e2b76e8d2
+                    commandsSent: 142
+                    scenariosTriggered: 38
+                    devicesOffline: 1
+                    notificationsSent: 21
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DeviceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ScenarioId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+
+    # ============================================================
+    # Общие enum'ы и базовые схемы устройств
+    # ============================================================
+
+    DeviceType:
+      type: string
+      enum: [THERMOSTAT, LAMP, CAMERA, LOCK, GATE, SENSOR]
+
+    DeviceConnectionStatus:
+      type: string
+      enum: [online, offline]
+
+    DeviceLifecycle:
+      type: string
+      enum: [provisioning, active, decommissioned]
+
+    DeviceState:
+      type: object
+      required: [deviceId, status, isPending, updatedAt]
+      properties:
+        deviceId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/DeviceConnectionStatus' }
+        isPending: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+
+    CommandAccepted:
+      type: object
+      required: [commandId]
+      properties:
+        commandId: { type: string, format: uuid }
+        acceptedAt: { type: string, format: date-time }
+
+    # ---- IAM ----
+    RegisterRequest:
+      type: object
+      required: [email, password, name]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+    User:
+      type: object
+      required: [id, email, name, role, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+        phone: { type: string }
+        role:
+          type: string
+          enum: [owner, member, guest, support]
+        createdAt: { type: string, format: date-time }
+
+    # ---- Devices (catalog) ----
+    Device:
+      type: object
+      required: [id, type, name, houseId, roomId, status, lifecycle, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        type: { $ref: '#/components/schemas/DeviceType' }
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        roomId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/DeviceConnectionStatus' }
+        lifecycle: { $ref: '#/components/schemas/DeviceLifecycle' }
+        createdAt: { type: string, format: date-time }
+    RegisterDeviceRequest:
+      type: object
+      required: [type, name, houseId, roomId, pairingCode]
+      properties:
+        type: { $ref: '#/components/schemas/DeviceType' }
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        roomId: { type: string, format: uuid }
+        pairingCode: { type: string }
+    UpdateDeviceRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        roomId: { type: string, format: uuid }
+
+    # ---- Climate (термостат) ----
+    ThermostatSettings:
+      type: object
+      properties:
+        isEnabled: { type: boolean }
+        targetTemp:
+          type: number
+          format: float
+          minimum: 5
+          maximum: 35
+    ThermostatState:
+      allOf:
+        - $ref: '#/components/schemas/DeviceState'
+        - $ref: '#/components/schemas/ThermostatSettings'
+        - type: object
+          properties:
+            currentTemp: { type: number, format: float }
+    ThermostatCommand:
+      allOf:
+        - $ref: '#/components/schemas/ThermostatSettings'
+        - type: object
+          minProperties: 1
+    TelemetryPoint:
+      type: object
+      required: [ts, value]
+      properties:
+        ts: { type: string, format: date-time }
+        value: { type: number, format: float }
+    HouseSummary:
+      type: object
+      properties:
+        houseId: { type: string, format: uuid }
+        avgTemp: { type: number, format: float }
+        activeDevices: { type: integer }
+        devicesOnline: { type: integer }
+        devicesOffline: { type: integer }
+
+    # ---- Lighting (лампы и сцены) ----
+    LampSettings:
+      type: object
+      properties:
+        isEnabled: { type: boolean }
+        brightness:
+          type: integer
+          minimum: 0
+          maximum: 100
+        color: { type: string }
+    LampState:
+      allOf:
+        - $ref: '#/components/schemas/DeviceState'
+        - $ref: '#/components/schemas/LampSettings'
+    LampCommand:
+      allOf:
+        - $ref: '#/components/schemas/LampSettings'
+        - type: object
+          minProperties: 1
+    Scene:
+      type: object
+      required: [id, name, houseId, lamps]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        lamps:
+          type: array
+          items: { $ref: '#/components/schemas/LampState' }
+    CreateSceneRequest:
+      type: object
+      required: [name, houseId, lamps]
+      properties:
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        lamps:
+          type: array
+          items: { $ref: '#/components/schemas/LampState' }
+
+    # ---- Security (камеры, замки, ворота) ----
+    CameraState:
+      allOf:
+        - $ref: '#/components/schemas/DeviceState'
+        - type: object
+          properties:
+            isEnabled: { type: boolean }
+    CameraEvent:
+      type: object
+      required: [id, cameraId, ts, type]
+      properties:
+        id: { type: string, format: uuid }
+        cameraId: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        type: { type: string, enum: [motion, person, vehicle] }
+        snapshotUrl: { type: string, format: uri }
+    LockSettings:
+      type: object
+      properties:
+        isOpen: { type: boolean }
+    LockState:
+      allOf:
+        - $ref: '#/components/schemas/DeviceState'
+        - $ref: '#/components/schemas/LockSettings'
+    AccessGrant:
+      type: object
+      required: [id, houseId, granteeEmail, role, validFrom, validUntil]
+      properties:
+        id: { type: string, format: uuid }
+        houseId: { type: string, format: uuid }
+        granteeEmail: { type: string, format: email }
+        role: { type: string, enum: [member, guest] }
+        validFrom: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        devices:
+          type: array
+          items: { type: string, format: uuid }
+    CreateAccessGrantRequest:
+      type: object
+      required: [houseId, granteeEmail, role, validFrom, validUntil]
+      properties:
+        houseId: { type: string, format: uuid }
+        granteeEmail: { type: string, format: email }
+        role: { type: string, enum: [member, guest] }
+        validFrom: { type: string, format: date-time }
+        validUntil: { type: string, format: date-time }
+        devices:
+          type: array
+          items: { type: string, format: uuid }
+
+    # ---- Automation ----
+    Scenario:
+      type: object
+      required: [id, name, houseId, enabled, trigger, actions]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        enabled: { type: boolean }
+        trigger: { $ref: '#/components/schemas/Trigger' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/Action' }
+    CreateScenarioRequest:
+      type: object
+      required: [name, houseId, trigger, actions]
+      properties:
+        name: { type: string }
+        houseId: { type: string, format: uuid }
+        enabled: { type: boolean, default: true }
+        trigger: { $ref: '#/components/schemas/Trigger' }
+        actions:
+          type: array
+          items: { $ref: '#/components/schemas/Action' }
+    Trigger:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [device.event, schedule, manual]
+        topic: { type: string }
+        match:
+          type: object
+          additionalProperties: true
+        cron: { type: string }
+    Action:
+      type: object
+      required: [service, action]
+      properties:
+        service:
+          type: string
+          enum: [climate, lighting, security]
+        action: { type: string }
+        params:
+          type: object
+          additionalProperties: true
+    ScenarioRun:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        scenarioId: { type: string, format: uuid }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time }
+        status: { type: string, enum: [success, partial, failed] }
+        actionsTotal: { type: integer }
+        actionsFailed: { type: integer }
+
+    # ---- Billing ----
+    Subscription:
+      type: object
+      required: [id, userId, planCode, status, startedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        planCode: { type: string, enum: [free, pro_monthly, pro_yearly] }
+        status: { type: string, enum: [active, past_due, canceled, expired] }
+        startedAt: { type: string, format: date-time }
+        currentPeriodEnd: { type: string, format: date-time }
+    CreateSubscriptionRequest:
+      type: object
+      required: [userId, planCode, paymentMethodId]
+      properties:
+        userId: { type: string, format: uuid }
+        planCode: { type: string, enum: [pro_monthly, pro_yearly] }
+        paymentMethodId: { type: string }
+    Payment:
+      type: object
+      required: [id, subscriptionId, amount, currency, status]
+      properties:
+        id: { type: string, format: uuid }
+        subscriptionId: { type: string, format: uuid }
+        amount: { type: integer }
+        currency: { type: string, example: RUB }
+        status: { type: string, enum: [pending, succeeded, failed, refunded] }
+        paidAt: { type: string, format: date-time }
+    PaymentWebhookEvent:
+      type: object
+      required: [event, paymentId, ts]
+      properties:
+        event:
+          type: string
+          enum: [payment.succeeded, payment.failed, subscription.renewed]
+        paymentId: { type: string }
+        subscriptionId: { type: string, format: uuid }
+        amount: { type: integer }
+        currency: { type: string }
+        ts: { type: string, format: date-time }
+
+    # ---- Analytics ----
+    DeviceFleet:
+      type: object
+      properties:
+        total: { type: integer }
+        online: { type: integer }
+        offline: { type: integer }
+        byType:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              online: { type: integer }
+              offline: { type: integer }
+    Incident:
+      type: object
+      required: [id, ts, severity, service, summary]
+      properties:
+        id: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        severity: { type: string, enum: [low, medium, high, critical] }
+        service: { type: string }
+        summary: { type: string }
+        affectedHouses: { type: integer }
+    Anomaly:
+      type: object
+      required: [id, ts, deviceId, kind]
+      properties:
+        id: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        deviceId: { type: string, format: uuid }
+        kind: { type: string, enum: [temperature_spike, temperature_drop, signal_loss, abnormal_motion] }
+        value: { type: number }
+        expectedRange:
+          type: object
+          properties:
+            from: { type: number }
+            to: { type: number }
+    UserActivitySummary:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        commandsSent: { type: integer }
+        scenariosTriggered: { type: integer }
+        devicesOffline: { type: integer }
+        notificationsSent: { type: integer }
+
+    # ---- Common ----
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            default:
+              value: { code: VALIDATION_ERROR, message: Поле обязательно }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Доступ запрещён
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ServerError:
+      description: Внутренняя ошибка сервера
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+security:
+  - bearerAuth: []

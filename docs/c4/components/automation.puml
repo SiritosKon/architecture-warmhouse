@@ -1,0 +1,27 @@
+@startuml automation
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Automation Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+ContainerQueue(broker, "Message Broker", "Kafka", "События продуктовых сервисов")
+ContainerDb(db, "Database", "PostgreSQL")
+Container(smart_home, "Smart Home Services", "", "Climate · Lighting · Security")
+
+Container_Boundary(automation, "Automation Service") {
+    Component(api, "Automation REST API", "", "CRUD сценариев, история срабатываний")
+    Component(builder, "Rule Builder", "", "Валидация и сохранение правил")
+    Component(engine, "Rule Engine", "", "Слушает события и матчит их с правилами")
+    Component(dispatcher, "Action Dispatcher", "", "REST-команды в продуктовые сервисы")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, builder, "Использует")
+Rel(builder, db, "Read/Write", "SQL")
+Rel(engine, broker, "Subscribe events", "Kafka")
+Rel(engine, db, "Read правил, Write истории", "SQL")
+Rel(engine, dispatcher, "Match → действия")
+Rel(dispatcher, smart_home, "Команды", "REST")
+
+SHOW_LEGEND()
+@enduml

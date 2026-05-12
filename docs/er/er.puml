@@ -1,0 +1,152 @@
+@startuml er
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam roundCorner 8
+
+title ER-диаграмма «Тёплый дом» (логическая модель)
+
+' === IAM / Identity ===
+entity User {
+    *id : UUID <<PK>>
+    --
+    *email : varchar
+    *name : varchar
+    *passwordHash : varchar
+    *role : varchar
+    *createdAt : timestamp
+}
+
+entity HouseAccess {
+    *userId : UUID <<PK, FK>>
+    *houseId : UUID <<PK, FK>>
+    --
+    *role : varchar
+    *grantedAt : timestamp
+}
+
+' === Devices ===
+entity House {
+    *id : UUID <<PK>>
+    --
+    *ownerId : UUID <<FK>>
+    *name : varchar
+    address : varchar
+    *createdAt : timestamp
+}
+
+entity Room {
+    *id : UUID <<PK>>
+    --
+    *houseId : UUID <<FK>>
+    *name : varchar
+}
+
+entity DeviceType {
+    *id : UUID <<PK>>
+    --
+    *code : varchar
+    *name : varchar
+    description : text
+}
+
+entity Device {
+    *id : UUID <<PK>>
+    --
+    *typeId : UUID <<FK>>
+    *roomId : UUID <<FK>>
+    *serial : varchar
+    *model : varchar
+    *status : varchar
+    lastSeen : timestamp
+    *createdAt : timestamp
+}
+
+' === Climate / Security (timeseries) ===
+entity TelemetryData {
+    *id : bigint <<PK>>
+    --
+    *deviceId : UUID <<FK>>
+    *timestamp : timestamp
+    *metric : varchar
+    *value : numeric
+}
+
+' === Automation ===
+entity Scenario {
+    *id : UUID <<PK>>
+    --
+    *houseId : UUID <<FK>>
+    *name : varchar
+    *active : boolean
+    *triggerEventType : varchar
+    cooldown : interval
+    lastFiredAt : timestamp
+    *createdAt : timestamp
+}
+
+entity ScenarioAction {
+    *id : UUID <<PK>>
+    --
+    *scenarioId : UUID <<FK>>
+    *targetService : varchar
+    *operation : varchar
+    payload : jsonb
+    *ordering : int
+}
+
+' === Billing ===
+entity Subscription {
+    *id : UUID <<PK>>
+    --
+    *userId : UUID <<FK>>
+    *plan : varchar
+    *status : varchar
+    *startDate : date
+    endDate : date
+    *createdAt : timestamp
+}
+
+entity Payment {
+    *id : UUID <<PK>>
+    --
+    *subscriptionId : UUID <<FK>>
+    *amount : decimal
+    *currency : varchar
+    *status : varchar
+    providerRef : varchar
+    *createdAt : timestamp
+}
+
+' === Notifications ===
+entity NotificationLog {
+    *id : UUID <<PK>>
+    --
+    *deviceId : UUID <<FK>>
+    *channel : varchar
+    *status : varchar
+    template : varchar
+    *sentAt : timestamp
+}
+
+' === Связи ===
+User ||--o{ House : "владеет"
+User ||--o{ Subscription
+User ||--o{ HouseAccess
+
+House ||--o{ HouseAccess
+House ||--o{ Room
+House ||--o{ Scenario
+
+Room ||--o{ Device
+
+DeviceType ||--o{ Device
+
+Device ||--o{ TelemetryData
+Device ||--o{ NotificationLog
+
+Scenario ||--o{ ScenarioAction
+
+Subscription ||--o{ Payment
+
+@enduml

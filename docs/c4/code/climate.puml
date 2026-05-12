@@ -1,0 +1,78 @@
+@startuml climate
+set namespaceSeparator none
+hide empty members
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+title Code — Climate Service: управление устройствами отопления (UML class diagram)
+
+abstract class Device {
+    #id: UUID
+    #houseId: UUID
+    #name: String
+    #status: DeviceStatus
+    #lastSeen: Instant
+    +getInfo(): DeviceInfo
+    +turnOn(): void
+    +turnOff(): void
+    +{abstract} collectStats(period: Duration): DeviceStats
+}
+
+class HeatingDevice {
+    -currentTemp: double
+    -targetTemp: double
+    +setTargetTemp(value: double): void
+    +getCurrentTemp(): double
+    +collectStats(period: Duration): DeviceStats
+}
+
+class HouseClimateManager {
+    -houseId: UUID
+    +turnOnAll(): void
+    +turnOffAll(): void
+    +setHouseTemperature(value: double): void
+    +getHouseOverview(): HouseOverview
+    +getHouseStats(period: Duration): HouseStats
+}
+
+class DeviceInfo <<value>> {
+    +id: UUID
+    +name: String
+    +status: DeviceStatus
+    +currentTemp: double
+    +targetTemp: double
+}
+
+class DeviceStats <<value>> {
+    +deviceId: UUID
+    +avgTemp: double
+    +minTemp: double
+    +maxTemp: double
+    +period: Duration
+}
+
+class HouseOverview <<value>> {
+    +houseId: UUID
+    +devices: List<DeviceInfo>
+}
+
+class HouseStats <<value>> {
+    +houseId: UUID
+    +deviceStats: List<DeviceStats>
+    +avgTemp: double
+}
+
+HeatingDevice --|> Device
+
+HouseClimateManager o--> "0..*" HeatingDevice : devices
+HouseClimateManager ..> HouseOverview : <<produces>>
+HouseClimateManager ..> HouseStats : <<produces>>
+
+Device ..> DeviceInfo : <<returns>>
+HeatingDevice ..> DeviceStats : <<returns>>
+
+HouseOverview o--> "0..*" DeviceInfo
+HouseStats o--> "0..*" DeviceStats
+
+@enduml

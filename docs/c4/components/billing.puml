@@ -1,0 +1,27 @@
+@startuml billing
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Billing Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+ContainerQueue(broker, "Message Broker", "Kafka", "Доменные события")
+ContainerDb(db, "Database", "PostgreSQL")
+System_Ext(payments, "Payment Provider", "Stripe / CloudPayments")
+
+Container_Boundary(billing, "Billing Service") {
+    Component(api, "Billing REST API", "", "HTTP-эндпоинты сервиса")
+    Component(subscriptions, "Subscription Manager", "", "Жизненный цикл подписок")
+    Component(payments_proc, "Payment Processor", "", "Платежи, ретраи, обработка webhook")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(payments, payments_proc, "Webhooks", "HTTPS")
+Rel(api, subscriptions, "Использует")
+Rel(api, payments_proc, "Использует")
+Rel(payments_proc, payments, "Списания", "REST")
+Rel(subscriptions, db, "Read/Write", "SQL")
+Rel(payments_proc, db, "Read/Write", "SQL")
+Rel(payments_proc, broker, "payment-события", "Kafka")
+
+SHOW_LEGEND()
+@enduml

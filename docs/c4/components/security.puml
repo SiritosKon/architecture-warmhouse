@@ -1,0 +1,28 @@
+@startuml security
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты — Security Service
+
+Container(api_gw, "API Gateway", "Kong / Envoy", "Маршрутизация запросов клиентов")
+Container(iot_gw, "Шлюз устройств", "MQTT", "Шлюз связи с физическими устройствами")
+ContainerQueue(broker, "Message Broker", "Kafka", "События и команды")
+ContainerDb(db, "Database", "PostgreSQL")
+
+Container_Boundary(security, "Security Service") {
+    Component(api, "Security REST API", "", "HTTP-эндпоинты сервиса")
+    Component(surveillance, "Surveillance Manager", "", "Стримы с камер, детекция событий")
+    Component(access, "Access Control", "", "Замки, ворота, права доступа")
+}
+
+Rel(api_gw, api, "Запросы", "JSON/HTTPS")
+Rel(api, surveillance, "Использует")
+Rel(api, access, "Использует")
+Rel(surveillance, iot_gw, "Команды камерам", "REST")
+Rel(access, iot_gw, "Команды замкам/воротам", "REST")
+Rel(surveillance, db, "Read/Write", "SQL")
+Rel(access, db, "Read/Write", "SQL")
+Rel(surveillance, broker, "Subscribe / Publish", "Kafka")
+Rel(access, broker, "access-события", "Kafka")
+
+SHOW_LEGEND()
+@enduml

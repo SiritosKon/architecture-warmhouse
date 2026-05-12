@@ -1,0 +1,25 @@
+@startuml context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_TOP_DOWN()
+
+title Контекст экосистемы «Тёплый дом»
+
+Person(user, "Пользователь", "Владелец дома. Покупает комплекты, самостоятельно подключает устройства, настраивает сценарии, смотрит инфографику, оплачивает подписку")
+Person(support, "Сотрудник поддержки", "Сопровождает пользователей, диагностирует проблемы устройств, работает с операционными дашбордами")
+
+System(warmhouse, "Экосистема «Тёплый дом»", "SaaS, multi-tenant. Управление устройствами (отопление, освещение, безопасность), сценарии автоматизации, телеметрия, подписки, уведомления")
+
+System_Ext(iot, "Устройства в доме", "Собственные и партнёрские датчики, реле, лампы, камеры, замки, ворота — в доме клиента")
+System_Ext(payments, "Payment Provider", "Stripe / CloudPayments. Подписки и разовые платежи за комплекты")
+System_Ext(channels, "Notification Channels", "Email / SMS / push (SendGrid, Twilio, FCM, APNs)")
+
+Rel(user, warmhouse, "Управляет домом, настраивает сценарии, оплачивает подписку", "HTTPS")
+Rel(support, warmhouse, "Сопровождает клиентов, диагностирует проблемы", "HTTPS")
+Rel(warmhouse, iot, "Отправляет команды устройствам", "MQTT / HTTP")
+Rel(iot, warmhouse, "Шлёт телеметрию и события", "MQTT / HTTP")
+Rel(warmhouse, payments, "Списания и подписки", "REST / HTTPS")
+Rel(warmhouse, channels, "Доставка уведомлений", "REST / SMTP")
+
+SHOW_LEGEND()
+@enduml
